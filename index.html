@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DistMoE: Private-data Rehearsal-free Routing in Mixture-of-Experts for Distributed Instruction Tuning</title>
+  <meta name="description" content="DistMoE (NeurIPS 2026): a mixture-of-experts approach for distributed visual instruction tuning that trains client-specific private experts locally and composes them with a shared public MLLM, without pooling private data across clients.">
+  <meta property="og:title" content="DistMoE (NeurIPS 2026)">
+  <meta property="og:description" content="Private-data rehearsal-free routing in Mixture-of-Experts for distributed visual instruction tuning.">
+  <meta property="og:image" content="https://mainaksingha01.github.io/DistMoE/static/images/distmoe_teaser.png">
+  <meta property="og:url" content="https://mainaksingha01.github.io/DistMoE">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/png" href="static/images/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-soft: #f6f7f9;
+      --text: #1d2430;
+      --muted: #5b6575;
+      --border: #e3e6eb;
+      --accent: #1f4fd8;
+      --accent-soft: #e8eefc;
+      --good: #187a3c;
+      --good-soft: #e9f6ee;
+      --btn-bg: #1d2430;
+      --btn-text: #ffffff;
+      --figure-bg: #ffffff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #12151b;
+        --bg-soft: #1a1e26;
+        --text: #e6e9ef;
+        --muted: #a2abb9;
+        --border: #2c323d;
+        --accent: #7ea2ff;
+        --accent-soft: #1f2a44;
+        --good: #6fd39a;
+        --good-soft: #17301f;
+        --btn-bg: #e6e9ef;
+        --btn-text: #12151b;
+        --figure-bg: #ffffff;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      font-size: 17px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+    section { padding: 44px 0; border-top: 1px solid var(--border); }
+    h2 {
+      font-family: "Source Serif 4", Georgia, serif;
+      font-size: 1.75rem;
+      font-weight: 700;
+      text-align: center;
+      margin: 0 0 22px;
+    }
+    h3 { font-size: 1.1rem; margin: 26px 0 8px; }
+    p { margin: 0 0 14px; }
+
+    /* Hero */
+    .hero { text-align: center; padding: 56px 0 36px; }
+    .hero .logo { width: 116px; height: 116px; border-radius: 22px; margin-bottom: 18px; }
+    .hero h1 {
+      font-family: "Source Serif 4", Georgia, serif;
+      font-size: clamp(1.7rem, 4.2vw, 2.6rem);
+      line-height: 1.22;
+      font-weight: 700;
+      margin: 0 auto 10px;
+      max-width: 880px;
+    }
+    .hero h1 .name { font-variant: small-caps; letter-spacing: 0.01em; }
+    .venue {
+      display: inline-block;
+      margin: 6px 0 22px;
+      padding: 4px 14px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .authors { font-size: 1.12rem; margin-bottom: 6px; }
+    .authors span { margin: 0 10px; white-space: nowrap; }
+    .affils { color: var(--muted); font-size: 0.98rem; margin-bottom: 26px; }
+    .affils span { margin: 0 10px; white-space: nowrap; }
+    .buttons { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px;
+      border-radius: 999px;
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      font-weight: 600;
+      font-size: 0.97rem;
+    }
+    .btn:hover { text-decoration: none; opacity: 0.88; }
+    .btn svg { width: 18px; height: 18px; fill: currentColor; }
+
+    /* Figures */
+    figure { margin: 0 0 8px; }
+    .fig {
+      background: var(--figure-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .fig img { width: 100%; height: auto; display: block; }
+    figcaption { color: var(--muted); font-size: 0.93rem; margin-top: 10px; }
+    .tldr {
+      background: var(--bg-soft);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-top: 24px;
+    }
+    .abstract { text-align: justify; hyphens: auto; }
+
+    /* Method cards */
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 26px; }
+    .card {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .card .step { font-size: 0.8rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; }
+    .card h4 { margin: 4px 0 8px; font-size: 1.05rem; }
+    .card p { font-size: 0.95rem; color: var(--muted); margin: 0; }
+    .eq {
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin: 18px 0;
+      text-align: center;
+      font-family: "Source Serif 4", Georgia, serif;
+      font-size: 1.15rem;
+      overflow-x: auto;
+    }
+
+    /* Stats */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 6px 0 30px; }
+    .stat {
+      text-align: center;
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 12px;
+    }
+    .stat .num { font-family: "Source Serif 4", Georgia, serif; font-size: 2rem; font-weight: 700; color: var(--accent); line-height: 1.1; }
+    .stat .lbl { color: var(--muted); font-size: 0.9rem; margin-top: 6px; }
+
+    /* Tables */
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+    th, td { padding: 8px 10px; text-align: center; white-space: nowrap; }
+    th { background: var(--bg-soft); font-weight: 600; border-bottom: 1px solid var(--border); }
+    td:first-child, th:first-child { text-align: left; }
+    tr.group td { background: var(--bg-soft); font-weight: 600; text-align: left; border-top: 1px solid var(--border); }
+    tr.ours td { background: var(--good-soft); }
+    tr.ours td:first-child { font-weight: 600; }
+    td b { color: var(--good); }
+    .note { color: var(--muted); font-size: 0.88rem; margin-top: 10px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* BibTeX */
+    pre {
+      position: relative;
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      overflow-x: auto;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.85rem;
+      line-height: 1.55;
+      margin: 0;
+    }
+    .copy {
+      position: absolute; top: 10px; right: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    footer { border-top: 1px solid var(--border); padding: 28px 0 40px; text-align: center; color: var(--muted); font-size: 0.88rem; }
+
+    @media (max-width: 760px) {
+      body { font-size: 16px; }
+      .cards, .stats, .two-col { grid-template-columns: 1fr; }
+      .abstract { text-align: left; }
+      .authors span, .affils span { display: inline-block; margin: 2px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="container">
+    <img class="logo" src="static/images/logo.png" alt="DistMoE logo">
+    <h1><span class="name">DistMoE</span>: Private-data Rehearsal-free Routing in Mixture-of-Experts for Distributed Instruction Tuning</h1>
+    <div class="venue">NeurIPS 2026</div>
+    <div class="authors">
+      <span>Mainak Singha<sup>1</sup></span>
+      <span>Niccolò Biondi<sup>1</sup></span>
+      <span>Elisa Ricci<sup>1,2</sup></span>
+      <span>Subhankar Roy<sup>3</sup></span>
+    </div>
+    <div class="affils">
+      <span><sup>1</sup>University of Trento</span>
+      <span><sup>2</sup>Fondazione Bruno Kessler</span>
+      <span><sup>3</sup>University of Bergamo</span>
+    </div>
+    <div class="buttons">
+      <a class="btn" href="https://openreview.net/forum?id=WN0djCTue9" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V8h4.5L14 3.5zM8 12h8v1.6H8V12zm0 3.4h8V17H8v-1.6zm0-6.8h4v1.6H8V8.6z"/></svg>
+        Paper
+      </a>
+      <a class="btn" href="https://github.com/mainaksingha01/DistMoE" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+        Code
+      </a>
+      <a class="btn" href="#bibtex">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm3.5 5L5 12l3.5 4 1.2-1.05L7.1 12l2.6-2.95L8.5 8zm7 0-1.2 1.05L16.9 12l-2.6 2.95L15.5 16l3.5-4-3.5-4z"/></svg>
+        BibTeX
+      </a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="container">
+      <figure>
+        <div class="fig"><img src="static/images/distmoe_teaser.png" alt="Centralized MoE tuning versus DistMoE"></div>
+        <figcaption><b>Centralized MoE tuning vs. DistMoE.</b> Centralized MoE methods rely on joint access to all domain-specific data. DistMoE trains domain-specific private experts where the data lives and composes them through a distributed router, so experts can be <i>added</i>, <i>removed</i>, or <i>reused</i> at inference time.</figcaption>
+      </figure>
+      <div class="tldr">
+        <b>TL;DR.</b> DistMoE privately trains client-specific experts and composes them with a shared public MLLM through inference-time routing, without ever pooling, sharing, or jointly revisiting private data across clients.
+      </div>
+    </div>
+  </section>
+
+  <section id="abstract">
+    <div class="container">
+      <h2>Abstract</h2>
+      <p class="abstract">Multimodal Large Language Models (MLLMs) have shown strong multimodal instruction-following ability, but adapting them to diverse visual-language domains typically assumes centralized data access and costly joint training. This is restrictive when data is distributed across private, domain-specific, or permission-limited clients. To this end, we propose DistMoE, a mixture-of-experts (MoE) approach for distributed visual instruction tuning. In each layer of the language decoder it augments the public feedforward network (FFN) with a client-specific private FFN expert, with the goal to acquire domain-specific knowledge. However, independent expert training causes the private FFNs to learn representations of different scale and magnitude, making merging the experts difficult. To reduce client-specific drift, we introduce a public-anchored expert composition stage that updates only routers and lightweight private projection adapters on a mix of <i>local</i> client data and public data, via an isotropic regularization loss, making it private-data rehearsal-free: each client reuses only its own local data, and private data are never pooled, shared, or jointly revisited across clients. During inference, DistMoE performs modular routing over public and private experts, enabling token-wise domain composition without explicit domain labels. Experiments across diverse visual-language benchmarks show that DistMoE enables flexible expert reuse, effective domain adaptation, and competitive performance while preserving modular control over client-specific knowledge.</p>
+    </div>
+  </section>
+
+  <section id="method">
+    <div class="container">
+      <h2>Method</h2>
+      <figure>
+        <div class="fig"><img src="static/images/distmoe_pipeline.png" alt="Overview of the DistMoE training and inference pipeline"></div>
+        <figcaption><b>Overview of DistMoE.</b> <i>Left:</i> each client first trains a private FFN initialized from the shared public FFN (Stage-I), then freezes the experts and recalibrates routing with an isotropic residual loss on a mix of its own data and public data (Stage-II). <i>Right:</i> at inference, the shared public expert and the calibrated private experts are composed through sparse routing, without domain labels.</figcaption>
+      </figure>
+
+      <div class="cards">
+        <div class="card">
+          <div class="step">Stage I</div>
+          <h4>Expert knowledge acquisition</h4>
+          <p>Each client trains a two-expert MoE: a frozen public FFN and a private FFN initialized from it. Only the private expert and its router are updated, on local data.</p>
+        </div>
+        <div class="card">
+          <div class="step">Stage II</div>
+          <h4>Public-anchored composition</h4>
+          <p>With experts frozen, a lightweight linear adapter and the router are recalibrated. An isotropic Gaussian loss makes each client's residual to the public expert comparable across clients.</p>
+        </div>
+        <div class="card">
+          <div class="step">Inference</div>
+          <h4>Modular sparse routing</h4>
+          <p>Calibrated experts from all clients are merged into one MoE and routed token-wise with top-<i>k</i>. Any expert can be added or disabled at inference, with no retraining.</p>
+        </div>
+      </div>
+
+      <h3>Why residuals?</h3>
+      <p>At inference, the routed output can be written as the public expert plus the routing-weighted <i>client residuals</i>:</p>
+      <div class="eq">o = h<sub>pub</sub> + &Sigma;<sub>m</sub> &alpha;<sub>m</sub> &Delta;<sub>m</sub>, &nbsp;&nbsp; with &nbsp; &Delta;<sub>m</sub> = T<sub>m</sub>(E<sub>m</sub>(x)) &minus; h<sub>pub</sub></div>
+      <p>A private expert therefore influences the output through two factors: how much the router selects it (&alpha;<sub>m</sub>) and how far its residual moves the representation (&Delta;<sub>m</sub>). If independently trained experts produce residuals of different scales, the larger one dominates regardless of its routing weight. DistMoE anchors every client to the same public expert and the same isotropic Gaussian target, so that the learned routing weights, not representation magnitudes, decide which expert matters.</p>
+
+      <h3>Gauge-fixed composition</h3>
+      <p>Each client recalibrates its own two-way router, whose logits are only defined up to a shared shift. Composing clients through their private-vs-public log-odds, with the public logit anchored at zero, preserves the public&ndash;private balance each client learned. This changes inference only and needs no retraining.</p>
+    </div>
+  </section>
+
+  <section id="results">
+    <div class="container">
+      <h2>Results</h2>
+      <div class="stats">
+        <div class="stat"><div class="num">17 / 18</div><div class="lbl">benchmark means improved over FlexOlmo across three seeds (Qwen-1.8B and Phi-2.7B)</div></div>
+        <div class="stat"><div class="num">48 / 54</div><div class="lbl">matched seed&ndash;benchmark comparisons won</div></div>
+        <div class="stat"><div class="num">0</div><div class="lbl">private samples shared across clients during composition</div></div>
+      </div>
+
+      <h3>Distributed visual instruction tuning</h3>
+      <p>Five private clients (COCO, GQA, OCRVQA, TextVQA, Visual Genome) are composed on top of a public MoE-LLaVA backbone. Below, a selection of rehearsal-free distributed methods; the paper also reports centralized and rehearsal-based upper bounds.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Method</th><th>VQA<sup>v2</sup></th><th>GQA</th><th>SQA<sup>I</sup></th><th>VQA<sup>T</sup></th><th>POPE</th><th>MME</th><th>SEED</th><th>LLaVA<sup>W</sup></th><th>MM-Vet</th></tr>
+          </thead>
+          <tbody>
+            <tr class="group"><td colspan="10">Qwen-1.8B</td></tr>
+            <tr><td>Model Soup (wtd)</td><td>69.18</td><td>53.46</td><td>60.21</td><td>41.18</td><td>84.84</td><td>1160.35</td><td>54.06</td><td>51.10</td><td>14.70</td></tr>
+            <tr><td>BTM</td><td>69.73</td><td>53.81</td><td>60.66</td><td>41.87</td><td>85.46</td><td>1167.92</td><td>54.31</td><td>52.00</td><td>14.80</td></tr>
+            <tr><td>BTX</td><td>69.46</td><td>54.16</td><td>60.43</td><td>41.52</td><td>85.15</td><td>1174.63</td><td>54.63</td><td>52.90</td><td>14.90</td></tr>
+            <tr><td>FlexOlmo</td><td>70.01</td><td>54.26</td><td>60.85</td><td>41.70</td><td>85.98</td><td>1176.35</td><td>54.91</td><td>52.20</td><td>15.00</td></tr>
+            <tr class="ours"><td>DistMoE-LoRA</td><td>65.80</td><td>50.51</td><td>59.30</td><td>33.69</td><td>85.68</td><td>995.61</td><td>53.34</td><td><b>73.50</b></td><td><b>24.40</b></td></tr>
+            <tr class="ours"><td>DistMoE</td><td><b>70.27</b></td><td><b>55.35</b></td><td><b>61.03</b></td><td><b>42.66</b></td><td><b>86.38</b></td><td><b>1188.56</b></td><td><b>55.11</b></td><td>59.90</td><td>15.10</td></tr>
+            <tr class="group"><td colspan="10">Phi-2.7B</td></tr>
+            <tr><td>Model Soup (wtd)</td><td>65.92</td><td>52.34</td><td>59.89</td><td>39.76</td><td>74.43</td><td>1067.26</td><td>54.05</td><td>43.20</td><td>14.40</td></tr>
+            <tr><td>BTM</td><td>66.53</td><td>52.56</td><td>60.56</td><td>40.76</td><td>72.80</td><td>1106.64</td><td>52.82</td><td>41.70</td><td>16.30</td></tr>
+            <tr><td>BTX</td><td>67.80</td><td>52.67</td><td>60.24</td><td>40.53</td><td>73.62</td><td>1096.48</td><td>51.43</td><td>44.40</td><td>17.00</td></tr>
+            <tr><td>FlexOlmo</td><td>70.03</td><td>54.84</td><td>62.77</td><td>41.63</td><td>74.98</td><td>1193.71</td><td>58.79</td><td>52.00</td><td>18.30</td></tr>
+            <tr class="ours"><td>DistMoE-LoRA</td><td>42.89</td><td>32.84</td><td><b>69.52</b></td><td>31.77</td><td><b>80.84</b></td><td>862.60</td><td>59.38</td><td><b>75.30</b></td><td><b>23.80</b></td></tr>
+            <tr class="ours"><td>DistMoE</td><td><b>71.31</b></td><td><b>56.53</b></td><td>66.34</td><td><b>41.87</b></td><td>80.50</td><td><b>1291.41</b></td><td><b>59.96</b></td><td>55.90</td><td>19.80</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Bold marks the best result among the methods shown, per backbone. Single runs; three-seed results are reported in the paper appendix.</p>
+
+      <h3>Where do tokens go?</h3>
+      <p>Compared with FlexOlmo, DistMoE routes more mass to the shared public expert, especially in later layers, while still activating private experts when useful: private experts act as calibrated shifts around a public anchor rather than replacing it.</p>
+      <div class="two-col">
+        <figure>
+          <div class="fig"><img src="static/images/MME_flexolmo_both.png" alt="Routing mass per layer for FlexOlmo on MME"></div>
+          <figcaption>FlexOlmo</figcaption>
+        </figure>
+        <figure>
+          <div class="fig"><img src="static/images/MME_distmoe_both.png" alt="Routing mass per layer for DistMoE on MME"></div>
+          <figcaption>DistMoE</figcaption>
+        </figure>
+      </div>
+      <p class="note">Top-4 routing mass per MoE layer on MME with Qwen-1.8B.</p>
+
+      <h3>Analysis</h3>
+      <p><b>Residual geometry.</b> After Stage-I, private experts drift along their own low-dimensional subspaces at mismatched scales. Anchoring all adapters to the shared public expert removes most of this mismatch, and the isotropic loss further aligns the <i>shape</i> of the residual distributions across clients.</p>
+      <p><b>Flexibility.</b> Removing any single client expert at inference keeps the model well above the public backbone, so DistMoE does not depend on any one private expert.</p>
+      <p><b>Cost.</b> The overhead over FlexOlmo comes from one linear adapter per layer. Because adapters only run for the experts selected by top-<i>k</i>, inference cost is set by the routing budget rather than the number of clients.</p>
+    </div>
+  </section>
+
+  <section id="bibtex">
+    <div class="container">
+      <h2>BibTeX</h2>
+<pre id="bib"><button class="copy" type="button" onclick="copyBib(this)">Copy</button>@inproceedings{singha2026distmoe,
+  title     = {DistMoE: Private-data Rehearsal-free Routing in Mixture-of-Experts
+               for Distributed Instruction Tuning},
+  author    = {Singha, Mainak and Biondi, Niccol{\`o} and Ricci, Elisa and Roy, Subhankar},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2026}
+}</pre>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="container">
+    &copy; 2026 Mainak Singha, Niccolò Biondi, Elisa Ricci, Subhankar Roy.
+  </div>
+</footer>
+
+<script>
+  function copyBib(btn) {
+    var text = document.getElementById('bib').innerText.replace(/^Copy\s*/, '');
+    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+    try {
+      navigator.clipboard.writeText(text).then(done, function () {});
+    } catch (e) {}
+  }
+</script>
+</body>
+</html>
